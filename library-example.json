@@ -114,7 +114,7 @@
                     "route": "/store/:category/:productId",
                     "meta": {
                         "title": "Buy $nombre$ on Seo",
-                        "image": "__THUMBNAIL_IMG__/$foto$",
+                        "image": "__THUMBS__/$foto$",
                         "_request": {
                             "url": "__API__/quickView",
                             "post": true,

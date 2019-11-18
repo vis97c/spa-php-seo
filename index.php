@@ -36,15 +36,15 @@ function run ($libraryPath, $vueApp) {
 	$route = array_values($route)[0];
 
 	//check is route is valid
-	if($route['route'] === '/404' && $_SERVER['REQUEST_URI'] !== '/404'){
+	if($route['route'] === $notfound && $_SERVER['REQUEST_URI'] !== $notfound){
 		//unregisted route, redirect
-		die(header('Location: /404'));
+		die(header('Location: '.$notfound));
 	}
 
 	if (!$isDynamic) die(writeMeta($appData, $route['meta'], $vueApp));
 	//replace url shortcuts for the request propertie
 	if(isset($route['meta']['_request']['url'])){
-		$protocol = getenv('APP_ENV') === 'production' ? 'https://www.' : 'http://';
+		$protocol = getenv('APP_ENV') === 'production' ? 'https://' : 'http://';
 		$route['meta']['_request']['url'] = str_replace (array(
 			'__API__',
 			'__HOST__'
@@ -55,7 +55,7 @@ function run ($libraryPath, $vueApp) {
 	}
 	//replace url shortcut for the image propertie
 	if(isset($route['meta']['image'])){
-		$route['meta']['image'] = str_replace ('__THUMBNAIL_IMG__', $protocol.getenv('API_THUMBNAIL'), $route['meta']['image']);
+		$route['meta']['image'] = str_replace ('__THUMBS__', $protocol.getenv('API_THUMBNAIL'), $route['meta']['image']);
 	}
 	$dynamicData = getDynamicMeta($route['meta'], $route['route']);
 	die(writeMeta($appData, $dynamicData['meta'], $vueApp, ['name' => $route['name'], 'data' => $dynamicData['data']]));
@@ -103,7 +103,7 @@ function writeMeta ($appData, $meta, $vueApp, $data = null) {
 
 	//fallbacks
 	$title = isset($meta['title']) ? $meta['title'] : $appData['title'];
-	$canonical = 'https://www.'.$_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'];
+	$canonical = 'https://'.$_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'];
 	$description = isset($meta['description']) ? $meta['description'] : $appData['description'];
 	$image = isset($meta['image']) ? $meta['image'] : $appData['image'];
 	$keywords = isset($meta['keywords']) ? $meta['keywords'] : $appData['keywords'];
