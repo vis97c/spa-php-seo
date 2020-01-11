@@ -7,18 +7,15 @@
     "_404": "/404",
     "pages": [
         {
-            "name": "Example",
-            "route": "/example",
-            "meta": {
-                "title": "META CAN'T BE EMPTY AT ALL, USE AT LEAST ONE PROPERTIE, UNSETTET ONES WILL FALLBACK TO DEFAULTS ABOVE"
-            }
-        },
-        {
             "name": "Home",
             "route": "/",
             "meta": {
                 "title": "Seo | Home page"
             }
+        },
+        {
+            "name": "Example",
+            "route": "/example"
         },
         {
             "name": "Store",
@@ -29,7 +26,7 @@
             }
         },
             {
-                "name": "Fullpagetion",
+                "name": "Fullpagination",
                 "route": "/store/page/:pageNumber",
                 "meta": {
                     "title": "Page $page$ : Seo | Store",
@@ -47,7 +44,10 @@
             },
             {
                 "name": "Search",
-                "route": "/store/search?q=:param",
+                "route": "/store/search",
+                "query": {
+                    "q": ":param"
+                },
                 "meta": {
                     "title": "Searching for \"$parameter$\" on Seo",
                     "image": "https://picsum.photos/id/237/200/300",
@@ -60,8 +60,11 @@
                 }
             },
                 {
-                    "name": "Searchpagetion",
-                    "route": "/store/search/page/:pageNumber?q=:param",
+                    "name": "Searchpagination",
+                    "route": "/store/search/page/:pageNumber",
+                    "query": {
+                        "q": ":param"
+                    },
                     "meta": {
                         "title": "Page $page$ : Searching for \"$parameter$\" on Seo",
                         "image": "https://picsum.photos/id/237/200/300",
@@ -80,6 +83,9 @@
             {
                 "name": "Category",
                 "route": "/store/:category",
+                "reserved": [
+                    "search"
+                ],
                 "meta": {
                     "title": "$category$ on Seo",
                     "image": "https://picsum.photos/id/237/200/300",
@@ -92,8 +98,11 @@
                 }
             },
                 {
-                    "name": "Categorypagetion",
+                    "name": "Categorypagination",
                     "route": "/store/:category/page/:pageNumber",
+                    "reserved": [
+                        "search"
+                    ],
                     "meta": {
                         "title": "Page $page$ : $category$ on Seo",
                         "image": "https://picsum.photos/id/237/200/300",
@@ -112,6 +121,9 @@
                 {
                     "name": "ProductModal",
                     "route": "/store/:category/:productId",
+                    "reserved": [
+                        "search"
+                    ],
                     "meta": {
                         "title": "Buy $nombre$ on Seo",
                         "image": "__THUMBS__/$foto$",

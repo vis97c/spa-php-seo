@@ -3,7 +3,7 @@ require('./vendor/autoload.php');
 $dotenv = Dotenv\Dotenv::create(__DIR__);
 $dotenv->load();
 run('./library.json', './index.html');
-function run ($libraryPath, $vueApp) {
+function run ($libraryPath, $htmlTemplate) {
 	$library = file_get_contents(__DIR__.'/'.$libraryPath);
 	$library = json_decode($library, true);
 	$notfound = $library['_404'];
@@ -15,11 +15,22 @@ function run ($libraryPath, $vueApp) {
 		'keywords' => $library['_keywords']
 	);
 	$dynamicRoutes = array_reduce($library['pages'], function ($ac, $pg) {
-		if (stripos($pg['route'], ':') !== false) $ac[] = $pg;
+		if (stripos($pg['route'], ':') !== false) {
+			$ac[] = $pg;
+		}else{
+			//check for query parameters
+			if(array_key_exists('query', $pg)){
+				foreach ($pg['query'] as $queryKey => $queryParam) {
+					if (stripos($pg['query'][$queryKey], ':') !== false) {
+						$ac[] = $pg;
+					}
+				}
+			}
+		}
 		return $ac;
 	}, []);
 	$staticRoutes = array_reduce($library['pages'], function ($ac, $pg) {
-		if (stripos($pg['route'], ':') === false) $ac[] = $pg;
+		if (stripos($pg['route'], ':') === false && !array_key_exists('query', $pg)) $ac[] = $pg;
 		return $ac;
 	}, []);
 	$isDynamic = false;
@@ -41,7 +52,8 @@ function run ($libraryPath, $vueApp) {
 		die(header('Location: '.$notfound));
 	}
 
-	if (!$isDynamic) die(writeMeta($appData, $route['meta'], $vueApp));
+	$meta = isset($route['meta']) && !empty($route['meta']) ? $route['meta'] : $appData;
+	if (!$isDynamic) die(writeMeta($appData, $meta, $htmlTemplate));
 	//replace url shortcuts for the request propertie
 	if(isset($route['meta']['_request']['url'])){
 		$protocol = getenv('APP_ENV') === 'production' ? 'https://' : 'http://';
@@ -57,48 +69,95 @@ function run ($libraryPath, $vueApp) {
 	if(isset($route['meta']['image'])){
 		$route['meta']['image'] = str_replace ('__THUMBS__', $protocol.getenv('API_THUMBNAIL'), $route['meta']['image']);
 	}
-	$dynamicData = getDynamicMeta($route['meta'], $route['route']);
-	die(writeMeta($appData, $dynamicData['meta'], $vueApp, ['name' => $route['name'], 'data' => $dynamicData['data']]));
+
+	$current = array('route' => $route['route']);
+	if(isset($route['query'])){
+		$current['query'] = $route['query'];
+	}
+	$dynamicData = getDynamicMeta($route['meta'], $current);
+
+	die(writeMeta($appData, $dynamicData['meta'], $htmlTemplate, ['name' => $route['name'], 'data' => $dynamicData['data']]));
+}
+function buildQueryPath($fullPath){
+	//get parameters from given URL
+	$urlSplit = explode('?', substr($fullPath, 1));
+	//mount array
+	$build = array(
+		'path' => explode('/', $urlSplit[0])
+	);
+	if(array_key_exists(1, $urlSplit)){
+		//build Query if exist
+		$urlQuery = explode('&', $urlSplit[1]);
+		$urlQueryResults = [];
+		foreach ($urlQuery as $key => $value) {
+			$query = explode('=', $urlQuery[$key]);
+			$urlQueryResults[$query[0]] = isset($query[1]) ? $query[1] : '';
+		}
+		$build['query'] = $urlQueryResults;
+	}
+	return $build;
 }
 function dispatchInStaticRoutes ($routes) {
+	//compare current route to static ones
 	$paths = array_map(function ($route) {
 		return $route['route'];
 	}, $routes);
-	if (in_array($_SERVER['REQUEST_URI'], $paths)) return array_filter($routes, function ($route) {
-		return $route['route'] === $_SERVER['REQUEST_URI'];
-	});
+	$current = explode('index', $_SERVER['REQUEST_URI'])[0];
+	if (in_array($current, $paths)) {
+		return array_filter($routes, function ($route) use ($current){
+			return $route['route'] === $current;
+		});
+	}
 	return false;
 }
 function dispatchInDynamicRoutes ($routes) {
+	//compare current route to dynamic ones
 	$paths = array_map(function ($route) {
-		return $route['route'];
+		$p = buildQueryPath($route['route']);
+		if(array_key_exists('reserved', $route)){
+			$p['reserved'] = $route['reserved'];
+		}
+		if(array_key_exists('query', $route)){
+			$p['query'] = $route['query'];
+		}
+		return $p;
 	}, $routes);
 	//get parameters from current URL
-	$urlSplit = explode('?', substr($_SERVER['REQUEST_URI'], 1));
-	//break URL first
-	$currentUrl = explode('/', $urlSplit[0]);
+	$currentUrl = buildQueryPath($_SERVER['REQUEST_URI']);
+	//compare path & query
 	foreach ($paths as $path) {
-		//get parameters from current PATH
-		$pathSplit = explode('?', substr($path, 1));
-		//break PATH first
-		$pathUrl = explode('/', $pathSplit[0]);
-		$valid = true;
-		if (count($currentUrl) === count($pathUrl)) {
-			foreach ($pathUrl as $urlKey => $urlPart) {
-				if (stripos($urlPart, ':') === false and $urlPart !== $currentUrl[$urlKey]) {
+		if (count($currentUrl['path']) === count($path['path'])) {
+			$valid = true;
+
+			foreach ($path['path'] as $urlKey => $urlPart) {
+				//check if all parameters matches
+				//looks for the use of reserved words
+				if ((stripos($urlPart, ':') === false and $urlPart !== $currentUrl['path'][$urlKey]) or (array_key_exists('reserved', $path) && in_array($currentUrl['path'][$urlKey], $path['reserved']))) {
 					$valid = false;
 				}
 			}
-	
+			if(!empty($path['query'])){
+				//path is expecting query parameters
+				$valid = false;
+				if(isset($currentUrl['query']) && isset($path['query'])){
+					//both exist
+					foreach ($path['query'] as $urlKey => $urlPart) {
+						if (array_key_exists($urlKey, $currentUrl['query'])) {
+							$valid = true;
+						}
+					}
+				}
+				// there is no match, continue
+			}
 			if ($valid) return array_filter($routes, function ($route) use ($path) {
-				return $route['route'] === $path;
+				return buildQueryPath($route['route'])['path'] === $path['path'];
 			});
 		}
 	}
 	return false;
 }
-function writeMeta ($appData, $meta, $vueApp, $data = null) {
-	$file = file_get_contents(__DIR__.'/'.$vueApp);
+function writeMeta ($appData, $meta, $htmlTemplate, $data = null) {
+	$file = file_get_contents(__DIR__.'/'.$htmlTemplate);
 	$replace = '';
 
 	//fallbacks
@@ -132,32 +191,17 @@ function writeMeta ($appData, $meta, $vueApp, $data = null) {
 }
 function getRouteParams ($route, $meta) {
 	//get parameters from current URL
-	$urlSplit = explode('?', substr($_SERVER['REQUEST_URI'], 1));
-	//break URL first
-	$urlParams = explode('/', $urlSplit[0]);
-	//check for query params in URL
-	if(isset($urlSplit[1])){
-		$urlQuery = explode('&', $urlSplit[1]);
-		$urlQueryResults = [];
-		foreach ($urlQuery as $key => $value) {
-			$urlQueryResults[$key] = explode('=', $urlQuery[$key])[1];
-		}
-		$urlParams = array_merge($urlParams, $urlQueryResults);
+	$url = buildQueryPath($_SERVER['REQUEST_URI']);
+	$urlParams = $url['path'];
+	if(array_key_exists('query', $url)){
+		$urlParams = array_merge($urlParams, $url['query']);
 	}
-	//get parameters from ROUTE
-	$routeSplit = explode('?', substr($route, 1));
-	//break ROUTE first
-	$routeParams = explode('/', $routeSplit[0]);
-	//check for query params in URL
-	if(isset($routeSplit[1])){
-		$routeQuery = explode('&', $routeSplit[1]);
-		$routeQueryResults = [];
-		foreach ($routeQuery as $key => $value) {
-			$routeQueryResults[$key] = explode('=', $routeQuery[$key])[1];
-		}
-		$routeParams = array_merge($routeParams, $routeQueryResults);
+
+	$routeParams = buildQueryPath($route['route'])['path'];
+	if(array_key_exists('query', $route)){
+		$routeParams = array_merge($routeParams, $route['query']);
 	}
-	//compare
+	//comparar
 	$result = [];
 	foreach ($routeParams as $key => $value) {
 		if (stripos($value, ':') !== false) {
