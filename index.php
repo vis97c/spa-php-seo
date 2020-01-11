@@ -102,7 +102,7 @@ function dispatchInStaticRoutes ($routes) {
 	$paths = array_map(function ($route) {
 		return $route['route'];
 	}, $routes);
-	$current = explode('index', $_SERVER['REQUEST_URI'])[0];
+	$current = explode('index', explode('?',$_SERVER['REQUEST_URI'])[0])[0];
 	if (in_array($current, $paths)) {
 		return array_filter($routes, function ($route) use ($current){
 			return $route['route'] === $current;
