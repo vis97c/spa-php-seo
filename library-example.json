@@ -4,6 +4,10 @@
     "_description": "DEFAULT PAGE DESCRIPTION",
     "_image": "DEFAULT OG/TWITTER IMAGE",
     "_keywords": "DEFAULT CSV OF KEYWORDS",
+	"_twitter": {
+		"_site": null,
+		"_creator": null
+	},
     "_404": "/404",
     "pages": [
         {
@@ -17,6 +21,24 @@
             "name": "Example",
             "route": "/example"
         },
+        {
+            "route": "/portal",
+            "meta": {
+                "title": "User portal"
+            }
+        },
+            {
+                "route": "/portal/login",
+                "meta": {
+                    "title": "Login to the user portal"
+                }
+            },
+            {
+                "route": "/portal/*",
+                "reserved": [
+                     "login"
+                ]
+            },
         {
             "name": "Store",
             "route": "/store",
